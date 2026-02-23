@@ -1,0 +1,21 @@
+2026-02-23 19:15:32,230 INFO    MainThread:2044 [wandb_setup.py:_flush():81] Current SDK version is 0.25.0
+2026-02-23 19:15:32,230 INFO    MainThread:2044 [wandb_setup.py:_flush():81] Configure stats pid to 2044
+2026-02-23 19:15:32,230 INFO    MainThread:2044 [wandb_setup.py:_flush():81] Loading settings from environment variables
+2026-02-23 19:15:32,230 INFO    MainThread:2044 [wandb_init.py:setup_run_log_directory():717] Logging user logs to results\2026-02-23_19-14-15_bs_1024_lr_0.0004\wandb\offline-run-20260223_191532-26ftnzfl\logs\debug.log
+2026-02-23 19:15:32,230 INFO    MainThread:2044 [wandb_init.py:setup_run_log_directory():718] Logging internal logs to results\2026-02-23_19-14-15_bs_1024_lr_0.0004\wandb\offline-run-20260223_191532-26ftnzfl\logs\debug-internal.log
+2026-02-23 19:15:32,231 INFO    MainThread:2044 [wandb_init.py:init():844] calling init triggers
+2026-02-23 19:15:32,231 INFO    MainThread:2044 [wandb_init.py:init():849] wandb.init called with sweep_config: {}
+config: {'ar_model': {'target': 'RandAR_in.model.randar_gpt.RandARTransformer', 'params': {'n_layer': 36, 'n_head': 20, 'dim': 1280, 'model_type': 'c2i', 'vocab_size': 512, 'block_size': 64, 'num_classes': 10, 'cls_token_num': 1, 'resid_dropout_p': 0.1, 'ffn_dropout_p': 0.1, 'drop_path_rate': 0.0, 'token_dropout_p': 0.1, 'position_order': 'random', 'grad_checkpointing': True, 'zero_class_qk': True, 'num_inference_steps': 88}}, 'dataset': {'target': 'RandAR_in.dataset.imagenet.INatLatentDataset', 'params': {'root_dir': '\\data\\latents_cifar_10\\cifar10-cifar10-cifar10-32_codes'}}, 'tokenizer': {'target': 'RandAR_in.tokenizer.model.Model', 'params': {'batch_size': 256, 'num_training_updates': 15000, 'num_hiddens': 128, 'num_residual_hiddens': 32, 'num_residual_layers': 2, 'embedding_dim': 64, 'num_embeddings': 512, 'commitment_cost': 0.25, 'decay': 0.99, 'learning_rate': 0.001}}, 'accelerator': {'gradient_accumulation_steps': 1, 'mixed_precision': 'bf16', 'log_with': 'wandb'}, 'optimizer': {'lr': 0.0004, 'weight_decay': 0.05, 'beta1': 0.9, 'beta2': 0.95, 'max_grad_norm': 1.0, 'skip_grad_iter': 100, 'skip_grad_norm': 10}, 'lr_scheduler': {'type': 'cosine', 'warm_up_iters': 50000, 'min_lr_ratio': 0.05, 'num_cycles': 0.5}, 'exp_name': 'randar_xl_0.7b', 'max_iters': 360000, 'global_batch_size': 1024, 'ema': False, 'ema_decay': 0.9999, 'num_workers': 8, 'log_every': 100, 'ckpt_every': 10000, 'visualize_every': 10, 'keep_last_k': -1, 'resume_from': None, 'global_seed': 0, 'results_dir': 'results/', 'gpt_ckpt': 'None', 'vq_ckpt': './checkpoints/vq_ds16_c2i.pt', 'fid_ref_path': '/mnt/localssd/dataset/VIRTUAL_imagenet256_labeled.npz', 'fid_save_dir': '/mnt/localssd/results_tmp/', 'fid_num_samples': 10000, 'fid_eval_every': 500000, 'wandb_entity': 'RandAR', 'wandb_offline': False, '_wandb': {}}
+2026-02-23 19:15:32,231 INFO    MainThread:2044 [wandb_init.py:init():892] starting backend
+2026-02-23 19:15:34,496 INFO    MainThread:2044 [wandb_init.py:init():895] sending inform_init request
+2026-02-23 19:15:34,517 INFO    MainThread:2044 [wandb_init.py:init():903] backend started and connected
+2026-02-23 19:15:34,519 INFO    MainThread:2044 [wandb_init.py:init():973] updated telemetry
+2026-02-23 19:15:34,521 INFO    MainThread:2044 [wandb_init.py:init():997] communicating run to backend with 90.0 second timeout
+2026-02-23 19:15:34,661 INFO    MainThread:2044 [wandb_init.py:init():1042] starting run threads in backend
+2026-02-23 19:15:34,756 INFO    MainThread:2044 [wandb_run.py:_console_start():2524] atexit reg
+2026-02-23 19:15:34,757 INFO    MainThread:2044 [wandb_run.py:_redirect():2373] redirect: wrap_raw
+2026-02-23 19:15:34,757 INFO    MainThread:2044 [wandb_run.py:_redirect():2442] Wrapping output streams.
+2026-02-23 19:15:34,757 INFO    MainThread:2044 [wandb_run.py:_redirect():2465] Redirects installed.
+2026-02-23 19:15:34,760 INFO    MainThread:2044 [wandb_init.py:init():1082] run started, returning control to user process
+2026-02-23 19:18:34,482 INFO    wandb-AsyncioManager-main:2044 [service_client.py:_forward_responses():134] Reached EOF.
+2026-02-23 19:18:34,485 INFO    wandb-AsyncioManager-main:2044 [mailbox.py:close():155] Closing mailbox, abandoning 0 handles.

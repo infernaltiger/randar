@@ -1,0 +1,6 @@
+# Data files
+data/
+*.tar.gz
+*.zip
+__pycache__/
+*.pyc

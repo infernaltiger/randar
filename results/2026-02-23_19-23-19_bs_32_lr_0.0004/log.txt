@@ -1,0 +1,20 @@
+[[34m2026-02-23 19:23:19[0m] Experiment directory: results\2026-02-23_19-23-19_bs_32_lr_0.0004
+[[34m2026-02-23 19:23:19[0m] Checkpoint directory: results\2026-02-23_19-23-19_bs_32_lr_0.0004\checkpoints
+[[34m2026-02-23 19:23:19[0m] Device: cuda:0
+[[34m2026-02-23 19:23:19[0m] Seed: 0
+[[34m2026-02-23 19:23:20[0m] Dataset contains 50000 samples.
+[[34m2026-02-23 19:23:20[0m] Per-step batch size (on cuda:0): 32
+[[34m2026-02-23 19:23:20[0m] Grad accumulation steps: 1
+[[34m2026-02-23 19:23:20[0m] Effective global batch size: 32
+[[34m2026-02-23 19:23:28[0m] GPT Parameters: 732,801,280
+[[34m2026-02-23 19:23:34[0m] Starting training from iteration 0 to 360000
+[[34m2026-02-23 19:28:49[0m] Step 00000020 | Loss 6.2383 | Time 15.7703s | Grad Norm 1.0039 | LR 0.000000
+[[34m2026-02-23 19:32:54[0m] Step 00000040 | Loss 6.2376 | Time 12.2340s | Grad Norm 1.0268 | LR 0.000000
+[[34m2026-02-23 19:39:46[0m] Step 00000060 | Loss 6.2361 | Time 20.6061s | Grad Norm 1.0553 | LR 0.000000
+[[34m2026-02-23 19:43:40[0m] Step 00000080 | Loss 6.2329 | Time 11.6839s | Grad Norm 1.0640 | LR 0.000001
+[[34m2026-02-23 19:44:53[0m] Step 00000100 | Loss 6.2276 | Time 3.6833s | Grad Norm 1.0536 | LR 0.000001
+[[34m2026-02-23 19:47:57[0m] Step 00000120 | Loss 6.2209 | Time 9.1847s | Grad Norm 1.0410 | LR 0.000001
+[[34m2026-02-23 19:49:48[0m] Step 00000140 | Loss 6.2130 | Time 5.5747s | Grad Norm 1.0290 | LR 0.000001
+[[34m2026-02-23 19:51:12[0m] Step 00000160 | Loss 6.2021 | Time 4.1715s | Grad Norm 1.0203 | LR 0.000001
+[[34m2026-02-23 19:52:56[0m] Step 00000180 | Loss 6.1935 | Time 5.2124s | Grad Norm 1.0147 | LR 0.000001
+[[34m2026-02-23 19:54:16[0m] Step 00000200 | Loss 6.1815 | Time 3.9867s | Grad Norm 1.0118 | LR 0.000002

@@ -1,0 +1,16 @@
+{"time":"2026-02-23T19:09:44.6025108+03:00","level":"INFO","msg":"stream: starting","core version":"0.25.0"}
+{"time":"2026-02-23T19:09:44.9027147+03:00","level":"WARN","msg":"featurechecker: GraphQL client is nil, skipping feature loading"}
+{"time":"2026-02-23T19:09:44.9048006+03:00","level":"INFO","msg":"stream: created new stream","id":"hrl2k0pp"}
+{"time":"2026-02-23T19:09:44.9058199+03:00","level":"INFO","msg":"handler: started","stream_id":"hrl2k0pp"}
+{"time":"2026-02-23T19:09:44.9110351+03:00","level":"INFO","msg":"stream: started","id":"hrl2k0pp"}
+{"time":"2026-02-23T19:09:44.9115387+03:00","level":"INFO","msg":"sender: started","stream_id":"hrl2k0pp"}
+{"time":"2026-02-23T19:09:44.9115387+03:00","level":"INFO","msg":"writer: started","stream_id":"hrl2k0pp"}
+{"time":"2026-02-23T19:09:44.9158811+03:00","level":"WARN","msg":"runupserter: server does not expand metric globs but the x_server_side_expand_glob_metrics setting is set; ignoring"}
+{"time":"2026-02-23T19:09:59.9209414+03:00","level":"ERROR","msg":"monitor: error sampling metrics: process does not exist"}
+{"time":"2026-02-23T19:10:14.9205681+03:00","level":"ERROR","msg":"monitor: error sampling metrics: process does not exist"}
+{"time":"2026-02-23T19:10:29.9209252+03:00","level":"ERROR","msg":"monitor: error sampling metrics: process does not exist"}
+{"time":"2026-02-23T19:10:44.9210025+03:00","level":"ERROR","msg":"monitor: error sampling metrics: process does not exist"}
+{"time":"2026-02-23T19:10:59.92151+03:00","level":"ERROR","msg":"monitor: error sampling metrics: process does not exist"}
+{"time":"2026-02-23T19:11:14.920907+03:00","level":"ERROR","msg":"monitor: error sampling metrics: process does not exist"}
+{"time":"2026-02-23T19:11:29.9210075+03:00","level":"ERROR","msg":"monitor: error sampling metrics: process does not exist"}
+{"time":"2026-02-23T19:11:44.9206809+03:00","level":"ERROR","msg":"monitor: error sampling metrics: process does not exist"}

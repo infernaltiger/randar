@@ -1,0 +1,10 @@
+[[34m2026-02-23 19:14:15[0m] Experiment directory: results\2026-02-23_19-14-15_bs_1024_lr_0.0004
+[[34m2026-02-23 19:14:15[0m] Checkpoint directory: results\2026-02-23_19-14-15_bs_1024_lr_0.0004\checkpoints
+[[34m2026-02-23 19:14:15[0m] Device: cuda:0
+[[34m2026-02-23 19:14:15[0m] Seed: 0
+[[34m2026-02-23 19:14:15[0m] Dataset contains 50000 samples.
+[[34m2026-02-23 19:14:15[0m] Per-step batch size (on cuda:0): 1024
+[[34m2026-02-23 19:14:15[0m] Grad accumulation steps: 1
+[[34m2026-02-23 19:14:15[0m] Effective global batch size: 1024
+[[34m2026-02-23 19:14:22[0m] GPT Parameters: 732,801,280
+[[34m2026-02-23 19:15:34[0m] Starting training from iteration 0 to 360000
