@@ -1,5 +1,6 @@
 # Data files
 data/
+results/
 *.tar.gz
 *.zip
 __pycache__/
