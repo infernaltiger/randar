@@ -1,4 +1,0 @@
-[[34m2026-02-23 19:05:52[0m] Experiment directory: results\2026-02-23_19-05-52_bs_1024_lr_0.0004
-[[34m2026-02-23 19:05:52[0m] Checkpoint directory: results\2026-02-23_19-05-52_bs_1024_lr_0.0004\checkpoints
-[[34m2026-02-23 19:05:52[0m] Device: cuda:0
-[[34m2026-02-23 19:05:52[0m] Seed: 0
