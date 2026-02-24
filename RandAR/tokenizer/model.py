@@ -272,19 +272,36 @@ class Model(nn.Module):
     def decode_codes_to_img(self, indices: torch.Tensor, image_size: int) -> torch.Tensor:
         """
         Decode quantized token indices back to images.
+        
+        Args:
+            indices: [B, N] tensor of token indices (e.g. [B, 64])
+            image_size: target image height/width (e.g. 32 for CIFAR-10)
+        
+        Returns:
+            reconstructed images: [B, 3, image_size, image_size]
         """
-        # Reshape the indices into a (B, H, W) format
-        # H and W should match the dimensions of the token grid.
-        grid_size = int(indices.shape[1] ** 0.5)  # Assuming square grid
-        indices = indices.view(indices.shape[0], grid_size, grid_size)
+    # 1. Reshape to grid (assume square)
+        grid_size = int(indices.shape[1] ** 0.5)
+        assert grid_size * grid_size == indices.shape[1], \
+            f"Indices length {indices.shape[1]} is not a perfect square"
 
-        # Lookup the embeddings using the indices
-        embeddings = self._vq_vae.quantize.embedding(indices)  # (B, H, W, embedding_dim)
+        indices = indices.view(indices.shape[0], grid_size, grid_size)  # [B, H, W]
 
-        # Pass the embeddings through the decoder
-        x_recon = self._decoder(embeddings)  # (B, C, H, W)
+        # 2. Get codebook embeddings
+        # ⚠️ Ключевая фиксация: используем self._vq_vae._embedding, а не .quantize.embedding
+        codebook = self._vq_vae._embedding.weight  # [K, D]
+        embeddings = codebook[indices]  # [B, H, W, D]
 
-        # Resize to the desired image size (e.g., CIFAR-10 is 32x32)
-        x_recon = torch.nn.functional.interpolate(x_recon, size=(image_size, image_size), mode='bilinear', align_corners=False)
+        # 3. Permute to [B, D, H, W] for decoder
+        embeddings = embeddings.permute(0, 3, 1, 2).contiguous()  # [B, D, H, W]
+
+        # 4. Pass through decoder
+        x_recon = self._decoder(embeddings)  # [B, 3, H_dec, W_dec]
+
+        # 5. Resize to target size (if needed)
+        if x_recon.shape[2] != image_size or x_recon.shape[3] != image_size:
+            x_recon = torch.nn.functional.interpolate(
+                x_recon, size=(image_size, image_size), mode='bilinear', align_corners=False
+            )
 
         return x_recon

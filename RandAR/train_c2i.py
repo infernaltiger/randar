@@ -428,7 +428,7 @@ if __name__ == "__main__":
     parser.add_argument("--global-seed", type=int, default=None)
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--log-every", type=int, default=20)
-    parser.add_argument("--ckpt-every", type=int, default=5000)
+    parser.add_argument("--ckpt-every", type=int, default=8000)
     parser.add_argument("--keep-last-k", type=int, default=1)
     parser.add_argument("--mixed-precision", type=str, default="bf16", choices=["none", "fp16", "bf16"])
 
