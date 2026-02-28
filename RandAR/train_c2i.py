@@ -3,7 +3,6 @@ import sys
 import time
 import shutil
 import argparse
-from copy import deepcopy
 from datetime import datetime
 
 import numpy as np
@@ -11,14 +10,10 @@ import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from omegaconf import OmegaConf
-from tqdm import tqdm
-import wandb
+from clearml import Task, OutputModel
 
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
-
-# Make repo imports work when called from repo root.
-sys.path.append("./RandAR")
 
 from RandAR_in.util import instantiate_from_config
 from RandAR_in.dataset.builder import build_dataset
@@ -26,7 +21,8 @@ from RandAR_in.utils.visualization import make_grid
 from RandAR_in.utils.logger import create_logger
 from RandAR_in.utils.lr_scheduler import get_scheduler
 
-from tokenizer.model import Model as VQModel
+from torchmetrics.image.fid import FrechetInceptionDistance
+import math
 
 
 def cycle(dl: DataLoader):
@@ -79,12 +75,41 @@ def main(args):
     logger.info(f"Seed: {config.global_seed}")
 
     # -------------------------
+    # ClearML
+    # -------------------------
+    clearml_cfg = None
+    if "logging" in config and config.logging.get("backend") == "clearml":
+        clearml_cfg = config.logging.clearml
+
+    project_name = (clearml_cfg.project_name if clearml_cfg else "RandAR")
+    task_name = f"{(clearml_cfg.task_name_prefix if clearml_cfg else 'RandAR')}-{exp_name}"
+
+    task = Task.init(
+        project_name=project_name,
+        task_name=task_name,
+        output_uri=(clearml_cfg.output_uri if clearml_cfg and clearml_cfg.output_uri else None),
+        tags=[exp_name,
+              "train",
+              "tokenizer-"+str(config.ar_model.params.vocab_size),
+              "dataset-"+config.dataset.name,
+              "debug" if args.debug else "full",
+              ]
+    )
+
+    # log hyperparameters/config into ClearML
+    task.connect(OmegaConf.to_container(config, resolve=True), name="config")
+    task.connect(vars(args), name="args")
+
+    cml_logger = task.get_logger()
+
+    # optional: track checkpoints as an OutputModel in ClearML “Models”
+    output_model = OutputModel(task=task, framework="PyTorch")
+
+    # -------------------------
     # Dataset / Dataloader
     # -------------------------
-    # IMPORTANT:
-    # - For latent dataset, you should ensure the dataset returns LONG token ids.
-    # - If your INatLatentDataset still uses transforms.ToTensor(), fix it to torch.long.
-    dataset = build_dataset(is_train=True, args=args, transform=transforms.ToTensor())
+    is_train = not args.debug
+    dataset = build_dataset(is_train=is_train, args=args, transform=transforms.ToTensor())
 
     # Single GPU => per_gpu_batch_size is just global_batch_size / grad_accum
     grad_accum = int(config.accelerator.gradient_accumulation_steps)
@@ -98,7 +123,6 @@ def main(args):
         num_workers=args.num_workers,
         pin_memory=True,
         drop_last=True,
-        # Windows-friendly defaults:
         persistent_workers=(args.num_workers > 0),
         prefetch_factor=2 if args.num_workers > 0 else None,
     )
@@ -117,22 +141,21 @@ def main(args):
     model.train()
 
     # -------------------------
-    # Tokenizer (your CIFAR VQ-VAE)
+    # Tokenizer (CIFAR VQ-VAE)
     # -------------------------
-    # FIX: original script used ckpt_path (undefined). Use args.vq_ckpt instead.  :contentReference[oaicite:2]{index=2}
-    tokenizer = VQModel(128, 2, 32, 512, 64, 0.25, 0.99).to(device)
+    tokenizer = instantiate_from_config(config.tokenizer).to(device)
     tokenizer.load_state_dict(torch.load(args.vq_ckpt, map_location=device))
     tokenizer.eval()
     for p in tokenizer.parameters():
         p.requires_grad_(False)
+
+    fid_metric = FrechetInceptionDistance(feature=2048).to(device)
 
     # -------------------------
     # Optimizer / LR scheduler
     # -------------------------
     optimizer = model.configure_optimizer(**config.optimizer)
 
-    # In original code, num_training_steps was multiplied by num_processes (DDP).
-    # Here num_processes = 1.
     lr_scheduler = get_scheduler(
         name=config.lr_scheduler.type,
         optimizer=optimizer,
@@ -143,26 +166,8 @@ def main(args):
     )
 
     # -------------------------
-    # W&B
+    # Resume training
     # -------------------------
-    os.environ["WANDB__SERVICE_WAIT"] = "600"
-    if args.wandb_offline:
-        os.environ["WANDB_MODE"] = "offline"
-
-    wandb_run = wandb.init(
-        project="RandAR-Release",
-        entity=args.wandb_entity,
-        config=dict(config),
-        name=exp_name,
-        dir=experiment_dir,
-    )
-
-    # -------------------------
-    # Resume training (simple, single-process)
-    # -------------------------
-    # Your previous code resumed via accelerator.save_state/load_state; we replace with
-    # manual load/save of model+optimizer+lr_scheduler+step.
-    #
     # It will resume from the latest "iters_XXXXXXXX" folder if found.
     train_steps = 0
     saved_ckpt_dirs = [d for d in os.listdir(checkpoint_dir) if d.startswith("iters_")]
@@ -200,9 +205,9 @@ def main(args):
     use_amp = (args.mixed_precision in ["fp16", "bf16"])
     amp_dtype = torch.float16 if args.mixed_precision == "fp16" else (torch.bfloat16 if args.mixed_precision == "bf16" else None)
     if args.mixed_precision == "fp16":
-        scaler = torch.cuda.amp.GradScaler()
+        scaler = torch.amp.GradScaler()
 
-    # local helper to compute "grad norm" similarly to your original loop
+    # local helper to compute grad norm
     def compute_grad_norm_l2(m: torch.nn.Module) -> float:
         total = 0.0
         for p in m.parameters():
@@ -210,6 +215,63 @@ def main(args):
                 continue
             total += p.grad.data.norm(2).item()
         return total
+    
+    # local helper to compute FID score
+    def compute_fid(model, tokenizer, dataset, device, num_samples, batch_size, image_size):
+        model.eval()
+        fid_metric.reset()
+
+        # Build a loader that yields latent codes (x) and labels (y)
+        fid_loader = DataLoader(
+            dataset,
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=0,
+            drop_last=False,
+            pin_memory=True,
+        )
+
+        seen = 0
+        with torch.no_grad():
+            for x, y, _ in fid_loader:
+                if seen >= num_samples:
+                    break
+
+                x = x.to(device, non_blocking=True)
+                y = y.to(device, non_blocking=True)
+                real_codes = x.reshape(x.shape[0], -1)
+                cond = y.reshape(-1)
+
+                # Real images = VQ recon of dataset codes
+                real_imgs = tokenizer.decode_codes_to_img(real_codes, image_size)
+                # Expect uint8 [0..255] for torchmetrics FID
+                if real_imgs.dtype != torch.uint8:
+                    real_imgs = (real_imgs.clamp(0, 1) * 255).to(torch.uint8)
+
+                # Fake images = model samples
+                gen_codes = model.generate(
+                    cond=cond,
+                    token_order=None,
+                    cfg_scales=[4.0, 4.0],
+                    num_inference_steps=-1,
+                    temperature=1.0,
+                    top_k=0,
+                    top_p=1.0,
+                )
+                model.remove_caches()
+                fake_imgs = tokenizer.decode_codes_to_img(gen_codes, image_size)
+                if fake_imgs.dtype != torch.uint8:
+                    fake_imgs = (fake_imgs.clamp(0, 1) * 255).to(torch.uint8)
+
+                # Torchmetrics expects (N, 3, H, W), uint8
+                fid_metric.update(real_imgs, real=True)
+                fid_metric.update(fake_imgs, real=False)
+
+                seen += x.shape[0]
+
+        fid = float(fid_metric.compute().item())
+        model.train()
+        return fid
 
     while train_steps < total_iters:
         model.train()
@@ -218,13 +280,12 @@ def main(args):
         optimizer.zero_grad(set_to_none=True)
 
         loss_this_step = 0.0
-        grad_norm_this_step = 0.0
+        grad_norm = 0.0
 
         for micro in range(grad_accum):
-            x, y, _inat_index = next(data_loader)
+            x, y, _ = next(data_loader)
 
-            # NOTE: your latent dataset should already return token IDs.
-            # x typically has shape (B, 1, T). Your code flattens it.
+            # x typically has shape (B, 1, T)
             x = x.to(device, non_blocking=True)
             y = y.to(device, non_blocking=True)
 
@@ -248,9 +309,7 @@ def main(args):
             torch.nn.utils.clip_grad_norm_(model.parameters(), config.optimizer.max_grad_norm)
 
         grad_norm = compute_grad_norm_l2(model)
-        grad_norm_this_step = grad_norm
 
-        # mimic your "skip grad norm" logic
         if grad_norm < config.optimizer.skip_grad_norm or train_steps < config.optimizer.skip_grad_iter:
             if scaler is not None:
                 scaler.step(optimizer)
@@ -262,7 +321,7 @@ def main(args):
 
         # bookkeeping
         running_loss += (loss_this_step / grad_accum)
-        running_grad_norm += grad_norm_this_step
+        running_grad_norm += grad_norm
 
         train_steps += 1
 
@@ -272,6 +331,7 @@ def main(args):
         if train_steps % log_every == 0:
             avg_loss = running_loss / log_every
             avg_grad = running_grad_norm / log_every
+            avg_ppl = math.exp(min(avg_loss, 20.0))
 
             end_time = time.time()
             avg_time = (end_time - start_time) / log_every
@@ -283,21 +343,33 @@ def main(args):
                 f"Grad Norm {avg_grad:.4f} | LR {lr:.6f}"
             )
 
-            wandb.log(
-                {
-                    "loss": avg_loss,
-                    "benchmark/time": avg_time,
-                    "grad_norm": avg_grad,
-                    "lr": lr,
-                },
-                step=train_steps,
-            )
+            cml_logger.report_scalar("train", "loss_nll", iteration=train_steps, value=avg_loss)
+            cml_logger.report_scalar("train", "ppl", iteration=train_steps, value=avg_ppl)
+            cml_logger.report_scalar("train", "time_sec", iteration=train_steps, value=avg_time)
+            cml_logger.report_scalar("train", "grad_norm", iteration=train_steps, value=avg_grad)
+            cml_logger.report_scalar("train", "lr", iteration=train_steps, value=lr)
 
             running_loss = 0.0
             running_grad_norm = 0.0
 
         # -------------------------
-        # Visualization (teacher forcing / gt recon / generation)
+        # FID evaluation
+        # -------------------------
+        if args.fid_every > 0 and (train_steps % args.fid_every == 0):
+            fid_value = compute_fid(
+                model=model,
+                tokenizer=tokenizer,
+                dataset=dataset,
+                device=device,
+                num_samples=args.fid_num_samples,
+                batch_size=args.fid_batch,
+                image_size=args.image_size,
+            )
+            logger.info(f"Step {train_steps:08d} | FID {fid_value:.3f}")
+            cml_logger.report_scalar("eval", "FID", iteration=train_steps, value=fid_value)
+
+        # -------------------------
+        # Visualization
         # -------------------------
         if visualize_every > 0 and (train_steps % visualize_every == 0):
             model.eval()
@@ -333,7 +405,6 @@ def main(args):
                 gt_recon_imgs = tokenizer.decode_codes_to_img(visualize_gt_indices, args.image_size)
 
                 # generation
-                # FIX: in single GPU, do NOT use model.module.generate  :contentReference[oaicite:3]{index=3}
                 gen_indices = model.generate(
                     cond=visualize_cond,
                     token_order=None,
@@ -350,14 +421,9 @@ def main(args):
                 gt_recon_grid = make_grid(gt_recon_imgs)
                 gen_grid = make_grid(gen_imgs)
 
-                wandb.log(
-                    {
-                        "pred_recon": wandb.Image(pred_recon_grid),
-                        "gt_recon": wandb.Image(gt_recon_grid),
-                        "gen": wandb.Image(gen_grid),
-                    },
-                    step=train_steps,
-                )
+                cml_logger.report_image("viz", "pred_recon", iteration=train_steps, image=pred_recon_grid)
+                cml_logger.report_image("viz", "gt_recon", iteration=train_steps, image=gt_recon_grid)
+                cml_logger.report_image("viz", "gen", iteration=train_steps, image=gen_grid)
             model.train()
 
         # -------------------------
@@ -374,8 +440,17 @@ def main(args):
                 "train_steps": train_steps,
                 "config": dict(config),
             }
-            torch.save(state, os.path.join(ckpt_path, "train_state.pt"))
+
+            weights_file = os.path.join(ckpt_path, "train_state.pt")
+            torch.save(state, weights_file)
             logger.info(f"Saved Iter {train_steps} checkpoint to {ckpt_path}")
+
+            # Track latest checkpoint as a ClearML “model” snapshot
+            output_model.update_weights(
+                weights_filename=weights_file,
+                iteration=train_steps,
+                update_comment="training checkpoint",
+            )
 
             # remove older checkpoints (same policy as your code)
             for ckpt_dir in os.listdir(checkpoint_dir):
@@ -409,14 +484,14 @@ def main(args):
     torch.save(state, os.path.join(final_ckpt_dir, "train_state.pt"))
     logger.info(f"Saved Final Iter {train_steps} checkpoint to {final_ckpt_dir}")
 
-    wandb_run.finish()
+    task.close()
     logger.info("Training Done.")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--config", type=str, default="RandAR/configs/randar/randar_cifar10.yaml")
+    parser.add_argument("--config", type=str, default="RandAR/configs/randar_cifar10.yaml")
     parser.add_argument("--results-dir", type=str, default="results")
 
     # CIFAR-friendly
@@ -433,24 +508,23 @@ if __name__ == "__main__":
     parser.add_argument("--mixed-precision", type=str, default="bf16", choices=["none", "fp16", "bf16"])
 
     # Tokenizer ckpt
-    parser.add_argument("--vq-ckpt", type=str, default="RandAR/tokenizer/vqvae_cifar10.pth")
+    parser.add_argument("--vq-ckpt", type=str, default="RandAR/tokenizer_vq/vqvae_cifar10.pth")
 
     # Data
     parser.add_argument("--dataset", type=str, default="latent")
     parser.add_argument("--data-path", type=str, default="data/latents_cifar_10/cifar10-cifar10-cifar10-32_codes")
+    parser.add_argument("--debug", action="store_true")
 
     # Visualization
-    parser.add_argument("--visualize-every", type=int, default=2000)
+    parser.add_argument("--visualize-every", type=int, default=500)
     parser.add_argument("--visualize-num", type=int, default=32)
 
-    # W&B
-    parser.add_argument("--wandb-entity", type=str, default="RandAR")
-    parser.add_argument("--wandb-offline", action="store_true")
     parser.add_argument("--disk-location", type=str, default="")
 
-    args = parser.parse_args()
+    parser.add_argument("--fid-every", type=int, default=10000)         # 10000
+    parser.add_argument("--fid-num-samples", type=int, default=5000)    # 5000
+    parser.add_argument("--fid-batch", type=int, default=128)
 
-    if args.wandb_offline:
-        os.environ["WANDB_MODE"] = "offline"
+    args = parser.parse_args()
 
     main(args)

@@ -6,7 +6,9 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
+from networkx import config
 import numpy as np
+from omegaconf import OmegaConf
 import torch
 
 torch.backends.cuda.matmul.allow_tf32 = True
@@ -18,13 +20,12 @@ from tqdm import tqdm
 
 import sys
 
-# Make repo imports work when called from repo root.
 sys.path.append("./RandAR")
 
 from RandAR_in.dataset.builder import build_dataset
 from RandAR_in.dataset.augmentation import center_crop_arr
-from tokenizer.model import Model as VQModel
-
+from RandAR_in.util import instantiate_from_config
+from tokenizer_vq.model import Model as VQModel
 
 # -------------------------
 # Atomic save
@@ -58,9 +59,10 @@ def _atomic_save_npy(dst_path: Path, array: np.ndarray) -> None:
 # Checkpoint loading
 # -------------------------
 
-def load_tokenizer_from_yaml(ckpt_path: str, device: torch.device) -> torch.nn.Module:
-    vq_model = VQModel(128, 2, 32, 512, 64, 0.25, 0.99).to(device)
-    vq_model.load_state_dict(torch.load(ckpt_path, map_location=device))
+def load_tokenizer_from_yaml(args, device):
+    config = OmegaConf.load(args.config)
+    vq_model = instantiate_from_config(config.model).to(device)
+    vq_model.load_state_dict(torch.load(args.vq_ckpt, map_location=device))
     vq_model.eval()
     for p in vq_model.parameters():
         p.requires_grad_(False)
@@ -172,10 +174,11 @@ def main(args: argparse.Namespace) -> None:
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
 
-    print(f"[extract] device={device}, seed={seed}")
+    print(f"device={device}, seed={seed}")
 
     # ---- tokenizer (VQ-VAE) ----
-    vq_model = load_tokenizer_from_yaml(args.vq_ckpt, device)
+    vq_model = load_tokenizer_from_yaml(args, device)
+    print(f"Loaded VQ-VAE tokenizer from {args.vq_ckpt}")
 
     # ---- dataset + transforms ----
     transform = build_image_transform(args)
@@ -198,11 +201,11 @@ def main(args: argparse.Namespace) -> None:
     for c in range(int(dataset.nb_classes)):
         (out_dir / str(c)).mkdir(parents=True, exist_ok=True)
 
-    pbar = tqdm(total=len(data_loader), disable=False, desc="extract", ncols=120)
+    pbar = tqdm(data_loader, desc="Encoding images")
 
     printed_tokens = False
 
-    for x, y, index in data_loader:
+    for x, y, index in pbar:
         bs = x.shape[0]
         num_aug = x.shape[1] if args.aug_mode == "ten-crop" else 2
 
@@ -221,7 +224,7 @@ def main(args: argparse.Namespace) -> None:
         if not printed_tokens:
             printed_tokens = True
             grid = int(round(num_tokens ** 0.5))
-            print(f"[extract] tokens_per_image={num_tokens}, grid≈{grid}x{grid}, num_aug={num_aug}")
+            print(f"tokens_per_image={num_tokens}, grid={grid}x{grid}, num_aug={num_aug}")
 
         codes = indices_1d.view(total_imgs, num_tokens).view(bs, num_aug, num_tokens)
 
@@ -240,11 +243,13 @@ def main(args: argparse.Namespace) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
+    parser.add_argument("--config", type=str, default="RandAR\\configs\\vq-vae.yaml")
+
     parser.add_argument("--tokenizer-name", type=str, default="cifar10")
-    parser.add_argument("--vq-ckpt", type=str, default="RandAR/tokenizer/vqvae_cifar10.pth")
+    parser.add_argument("--vq-ckpt", type=str, default="RandAR\\tokenizer_vq\\vqvae_cifar10.pth")
     parser.add_argument("--dataset", type=str, default="cifar10")
-    parser.add_argument("--data-path", type=str, default="data/cifar10")
-    parser.add_argument("--code-path", type=str, default="data/latents_cifar_10")
+    parser.add_argument("--data-path", type=str, default=".\\data\\cifar10")
+    parser.add_argument("--code-path", type=str, default=".\\data\\latents_cifar_10")
     parser.add_argument("--debug", action="store_true")
 
     parser.add_argument("--batch-size", type=int, default=8)

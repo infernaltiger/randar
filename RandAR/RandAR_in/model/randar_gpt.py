@@ -8,20 +8,17 @@
 #   gpt-fast: https://github.com/pytorch-labs/gpt-fast/blob/main/model.py
 #   PixArt:   https://github.com/PixArt-alpha/PixArt-alpha/blob/master/diffusion/model/nets/PixArt_blocks.py
 
-import random
-import math
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
 from torch.utils.checkpoint import checkpoint
 
-from dataclasses import dataclass
 from typing import Optional, List, Tuple
 
 from .utils import DropPath, interleave_tokens, calculate_num_query_tokens_for_parallel_decoding
 from .generate import sample
-from .llamagen_gpt import LabelEmbedder, CaptionEmbedder, MLP, RMSNorm, \
-    FeedForward, KVCache, find_multiple, apply_rotary_emb, precompute_freqs_cis_2d
+from .llamagen_gpt import LabelEmbedder, CaptionEmbedder, RMSNorm, \
+    FeedForward, KVCache, find_multiple, precompute_freqs_cis_2d
 
 
 def batch_apply_rotary_emb(x: torch.Tensor, freqs_cis: torch.Tensor):
