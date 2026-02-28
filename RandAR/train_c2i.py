@@ -339,7 +339,7 @@ def main(args):
 
             lr = lr_scheduler.get_last_lr()[0]
             logger.info(
-                f"Step {train_steps:08d} | Loss {avg_loss:.4f} | Time {avg_time:.4f}s | "
+                f"Step {train_steps:08d} | Loss {avg_loss:.4f} | Time left {avg_time* (total_iters - train_steps):.0f}s | "
                 f"Grad Norm {avg_grad:.4f} | LR {lr:.6f}"
             )
 

@@ -60,7 +60,7 @@ dataset:
 # training related parameters
 exp_name: "randar_cifar10"
 max_iters: 360000 # 100k firt
-global_batch_size: 32
+global_batch_size: 128
 ema: False 
 ema_decay: 0.9999
 
