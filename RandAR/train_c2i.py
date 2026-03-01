@@ -60,8 +60,11 @@ def main(args):
     # -------------------------
     # Experiment directory
     # -------------------------
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    exp_name = timestamp + f"_bs_{config.global_batch_size}_lr_{config.optimizer.lr}"
+    if args.exp_name == "None":
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        exp_name = timestamp + f"_bs_{config.global_batch_size}_lr_{config.optimizer.lr}"
+    else:
+        exp_name = args.exp_name
     experiment_dir = os.path.join(args.results_dir, exp_name)
     checkpoint_dir = os.path.join(experiment_dir, "checkpoints")
 
@@ -179,7 +182,7 @@ def main(args):
         ckpt_file = os.path.join(ckpt_dir, "train_state.pt")
         if os.path.exists(ckpt_file):
             logger.info(f"Resuming from {ckpt_file}")
-            state = torch.load(ckpt_file, map_location="cpu")
+            state = torch.load(ckpt_file, map_location="cpu", weights_only=False)
             model.load_state_dict(state["model"])
             optimizer.load_state_dict(state["optimizer"])
             lr_scheduler.load_state_dict(state["lr_scheduler"])
@@ -499,13 +502,15 @@ if __name__ == "__main__":
     parser.add_argument("--num-classes", type=int, default=10)
 
     # Training
-    parser.add_argument("--max-iters", type=int, default=None)
-    parser.add_argument("--global-seed", type=int, default=None)
+    parser.add_argument("--max-iters", type=int, default=40000)
+    parser.add_argument("--global-seed", type=int, default=0)
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--log-every", type=int, default=20)
-    parser.add_argument("--ckpt-every", type=int, default=8000)
+    parser.add_argument("--ckpt-every", type=int, default=1000)
     parser.add_argument("--keep-last-k", type=int, default=1)
     parser.add_argument("--mixed-precision", type=str, default="bf16", choices=["none", "fp16", "bf16"])
+
+    parser.add_argument("exp_name", type=str, default="None")
 
     # Tokenizer ckpt
     parser.add_argument("--vq-ckpt", type=str, default="RandAR/tokenizer_vq/vqvae_cifar10.pth")
@@ -516,12 +521,12 @@ if __name__ == "__main__":
     parser.add_argument("--debug", action="store_true")
 
     # Visualization
-    parser.add_argument("--visualize-every", type=int, default=500)
-    parser.add_argument("--visualize-num", type=int, default=32)
+    parser.add_argument("--visualize-every", type=int, default=1000)
+    parser.add_argument("--visualize-num", type=int, default=16)
 
     parser.add_argument("--disk-location", type=str, default="")
 
-    parser.add_argument("--fid-every", type=int, default=10000)         # 10000
+    parser.add_argument("--fid-every", type=int, default=1000)         # 10000
     parser.add_argument("--fid-num-samples", type=int, default=5000)    # 5000
     parser.add_argument("--fid-batch", type=int, default=128)
 
