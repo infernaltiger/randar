@@ -510,7 +510,7 @@ if __name__ == "__main__":
     parser.add_argument("--keep-last-k", type=int, default=1)
     parser.add_argument("--mixed-precision", type=str, default="bf16", choices=["none", "fp16", "bf16"])
 
-    parser.add_argument("exp_name", type=str, default="None")
+    parser.add_argument("--exp_name", type=str, default="2026-02-28_19-19-19_bs_512_lr_0.0004")
 
     # Tokenizer ckpt
     parser.add_argument("--vq-ckpt", type=str, default="RandAR/tokenizer_vq/vqvae_cifar10.pth")
